@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: labendicion-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: labendicion_db
+    ports:
+      - '5433:5432'
+    volumes:
+      - labendicion_postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d labendicion_db']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  labendicion_postgres_data:

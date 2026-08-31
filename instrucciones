@@ -1,0 +1,79 @@
+# Contexto del Proyecto: Sistema POS "Tienda de Barrio La Bendición"
+
+## Resumen del negocio
+Tienda de barrio (retail B2C, venta presencial de abarrotes/consumo diario). Se requiere un sistema (desktop o web) para controlar inventario, ventas y administración. Roles: **Administrador** y **Cajero**. Metodología de desarrollo: **Cascada (Waterfall)**.
+
+## Objetivo del sistema
+Controlar inventario, agilizar ventas, emitir comprobantes, generar reportes y facilitar la consulta de productos/precios.
+
+## Stack tecnológico
+| Capa | Tecnología | Versión |
+|---|---|---|
+| Frontend | React.js (SPA) | v18.x |
+| Empaquetado desktop | Electron.js | v28.x |
+| Backend | Node.js + Express.js | v20.x LTS |
+| Base de datos | PostgreSQL | v16.x |
+| ORM | Prisma | v5.x |
+| Testing | Jest / Supertest | v29.x |
+| Comprobantes | PDFKit / WeasyPrint | v0.12.x |
+| SO objetivo | Linux Mint / Windows 11 | — |
+| Control de versiones | Git/GitHub (GitFlow) | — |
+
+## Módulos (orden de implementación por dependencia)
+1. **Login / Autenticación** — base de acceso y seguridad.
+2. **Gestión de Empleados** — roles antes de operar.
+3. **Gestión de Productos** — base para inventario/ventas.
+4. **Inventario/Bodega** — depende de productos.
+5. **Punto de Venta (POS)** — depende de productos+inventario.
+6. **Comprobante de Venta** — se genera tras cada venta.
+7. **Reportes** — depende de ventas/inventario ya generados.
+8. **Configuración** — transversal, datos de la tienda/respaldo BD.
+
+## Lógica funcional clave (reglas de negocio)
+
+**Autenticación**
+- Stateless con JWT (HMAC-SHA256), TTL de 8 horas, claims: `userId`, `role` (RBAC).
+- Login vía POST sobre HTTPS/TLS 1.3.
+- Contraseñas con bcrypt, cost factor = 12.
+
+**Empleados**
+- CRUD vía REST.
+- **No hay borrado físico**: se usa soft delete (`is_active: boolean`) para mantener trazabilidad/auditoría.
+
+**Productos / Código de barras**
+- Captura por lector USB/Bluetooth en modo "keyboard wedge" (EAN-13, UPC-A, Code-128).
+- Fórmula: `margen_ganancia = precio_venta - precio_costo`.
+
+**Punto de Venta**
+- Carrito gestionado en memoria/estado reactivo del cliente (no persiste en servidor hasta el cierre de venta).
+- Flujo: búsqueda → agregar al carrito → calcular total (con descuentos) → pago → comprobante → descuento automático de inventario.
+
+**Comprobantes**
+- Generación de PDF con PDFKit.
+- Envío paralelo de comandos ESC/POS a impresora térmica.
+
+**Reportes / BI**
+- Consultas SQL agregadas (`GROUP BY`, funciones de ventana) para: ventas diarias/mensuales, productos más vendidos, historial de margen bruto, stock bajo.
+
+## Requisitos no funcionales (ISO/IEC 25010)
+- **Usabilidad**: operable 100% por teclado (hotkeys) en caja.
+- **Fiabilidad**: persistencia local (offline-first) si se pierde conexión, con sync automática al reconectar.
+- **Desempeño**: búsqueda por código de barras < 100ms; RAM cliente < 200MB.
+- **Seguridad**: ORM con prepared statements (anti SQLi), sanitización anti-XSS, cumplimiento OWASP Top 10.
+- **Testing**: Jest para lógica de caja (subtotal, descuentos, impuestos, cambio); cobertura mínima ≥ 85%; UAT con Propietario/Encargado de Ventas.
+
+## Entidades de datos implícitas (para modelar en Prisma/PostgreSQL)
+- `usuarios` (id, nombre, rol, password_hash, is_active)
+- `productos` (id, nombre, categoría, código_barras, precio_costo, precio_venta, existencias)
+- `inventario` (movimientos: entradas, salidas, ajustes, historial, alertas stock bajo)
+- `ventas` (id, fecha_hora, cajero_id, total, método_pago)
+- `venta_detalle` (venta_id, producto_id, cantidad, precio_unitario)
+- `comprobantes` (número, venta_id, pdf_path/estado_impresión)
+- `configuración_tienda` (nombre, logo, dirección, teléfono)
+
+## Notas para el asistente de código (Codex)
+- Respetar el orden de módulos al generar código (dependencias entre entidades).
+- Nunca implementar `DELETE` físico en empleados/productos; usar soft delete.
+- Toda consulta a BD debe pasar por Prisma (no SQL crudo concatenado).
+- El cálculo de totales/descuentos/cambio en POS debe ser testeable de forma aislada (funciones puras) para cumplir cobertura Jest ≥85%.
+- Diseñar POS pensando en operación 100% por teclado.
