@@ -1,4 +1,5 @@
 import { prisma } from '../db/prisma.js';
+import { generarPronostico } from '../utils/forecast.js';
 
 export async function getSummaryReport(req, res, next) {
   try {
@@ -197,6 +198,48 @@ export async function getInventoryReport(_req, res, next) {
 
     const result = await prisma.$queryRawUnsafe(sql);
     return res.json({ inventoryByCategory: result });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+// Pronóstico de reabastecimiento: demanda estimada y agotamiento por producto
+export async function getForecastReport(req, res, next) {
+  try {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 365);
+
+    const sql = `
+      SELECT
+        p.id,
+        p.nombre,
+        p.codigo_barras,
+        c.nombre AS categoria_nombre,
+        COALESCE(SUM(si.cantidad), 0)::numeric AS unidades_vendidas,
+        p.stock_actual,
+        p.stock_minimo
+      FROM products p
+      LEFT JOIN sale_items si
+        ON si.product_id = p.id
+        AND si.sale_id IN (
+          SELECT id FROM sales
+          WHERE created_at >= now() - interval '${days} days'
+        )
+      LEFT JOIN categories c ON p.categoria_id = c.id
+      WHERE p.is_active = TRUE
+      GROUP BY p.id, p.nombre, p.codigo_barras, c.nombre, p.stock_actual, p.stock_minimo
+      ORDER BY p.nombre ASC
+    `;
+
+    const rows = await prisma.$queryRawUnsafe(sql);
+    const forecast = generarPronostico(rows, days);
+    const urgencia = {
+      SIN_DEMANDA: forecast.filter((f) => f.estado === 'SIN_DEMANDA').length,
+      AGOTADO: forecast.filter((f) => f.estado === 'AGOTADO').length,
+      URGENTE: forecast.filter((f) => f.estado === 'URGENTE').length,
+      PRONTO: forecast.filter((f) => f.estado === 'PRONTO').length,
+      OK: forecast.filter((f) => f.estado === 'OK').length,
+    };
+    return res.json({ days, forecast, urgencia });
   } catch (err) {
     return next(err);
   }

@@ -5,6 +5,7 @@ import {
   getMonthlySalesReport,
   getTopSellingProducts,
   getInventoryReport,
+  getForecastReport,
 } from '../controllers/reports.controller.js';
 import { authRequired, requireRole } from '../middlewares/auth.js';
 
@@ -17,5 +18,6 @@ router.get('/sales/daily', getDailySalesReport);
 router.get('/sales/monthly', getMonthlySalesReport);
 router.get('/products/top', getTopSellingProducts);
 router.get('/inventory', getInventoryReport);
+router.get('/forecast', getForecastReport);
 
 export default router;
