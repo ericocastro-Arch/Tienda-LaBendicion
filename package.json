@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "description": "Sistema de Gestión Interno y Punto de Venta (POS) - Tienda de Barrio La Bendición",
+  "engines": {
+    "node": ">=22 <25",
+    "npm": ">=10 <12"
+  },
   "workspaces": [
     "client",
     "server"
@@ -12,6 +16,7 @@
     "dev:server": "npm run dev --workspace server",
     "dev:client": "npm run dev --workspace client",
     "build": "npm run build --workspace client",
+    "test": "npm run test --workspace server",
     "start": "npm run start --workspace server",
     "db:schema": "psql \"$DATABASE_URL\" -f database/schema.sql",
     "db:seed": "psql \"$DATABASE_URL\" -f database/seed.sql",
